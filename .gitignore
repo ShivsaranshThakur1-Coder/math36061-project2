@@ -1,0 +1,20 @@
+# LaTeX build artefacts
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.toc
+docs/*.synctex.gz
+docs/*.nav
+docs/*.snm
+
+# LaTeX PDF output (rebuildable)
+docs/*.pdf
+
+# macOS
+.DS_Store
+
+# MATLAB temporary files
+*.asv
+
+# Videos (optional: comment these out if you decide to version them)
+docs/*.mp4
