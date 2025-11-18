@@ -123,14 +123,27 @@ We record the stopping time $T$, the fox position $F(T)$ and the distances $d_f(
 All simulations were implemented in \textsc{MATLAB} using the built-in solver \texttt{ode45}, an explicit Runge--Kutta (4,5) method with adaptive time stepping. The implementation is structured into small, unit-tested components under \texttt{src/} with tests under \texttt{tests/}:
 
 \begin{itemize}
-  \item \emph{Geometric primitives:} segment intersection and line-of-sight blocking for the fence segment $AE$.
-  \item \emph{Target selection logic:} a module that maps $(F,R)$ and phase to the target point $T$.
-  \item \emph{Kinematics:} separate modules for constant-speed and distance-dependent-speed models for both fox and rabbit.
-  \item \emph{Dynamics:} ODE right-hand sides and event functions for both questions.
-  \item \emph{High-level drivers:} \texttt{simulate\_constant\_case} and \texttt{simulate\_variable\_case} orchestrate the phases (running to $G$, then chasing) and assemble full trajectories.
+  \item Geometric primitives: segment intersection and line-of-sight blocking for the fence segment $AE$.
+  \item Target selection logic: a module that maps $(F,R)$ and phase to the target point $T$.
+  \item Kinematics: separate modules for constant-speed and distance-dependent-speed models for both fox and rabbit.
+  \item Dynamics: ODE right-hand sides and event functions for both questions.
+  \item High-level drivers: \texttt{simulate\_constant\_case} and \texttt{simulate\_variable\_case} orchestrate the phases (running to $G$, then chasing) and assemble full trajectories.
 \end{itemize}
 
 For both questions, the ODE solver is used with relative tolerance \texttt{RelTol = 1e-8} and absolute tolerance \texttt{AbsTol = 1e-10} in the main experiments. Events are implemented via custom event functions passed through \texttt{odeset}. All tests are executed using the \texttt{matlab.unittest} framework via a single script \texttt{run\_tests.sh}, which can be used in continuous integration.
+
+\section{Implementation and code structure}
+
+The code base is organised in a modular way under a single \texttt{src/} directory, with unit tests in \texttt{tests/}. The key entry points are:
+\begin{itemize}
+  \item \texttt{simulate\_constant\_case.m}, which implements the constant-speed fox--rabbit chase used to answer Question~1.
+  \item \texttt{simulate\_variable\_case.m}, which implements the diminishing-speed model used in Question~2.
+  \item \texttt{plot\_constant\_case.m} and \texttt{plot\_variable\_case.m}, which generate the path plots in Figures~\ref{fig:constant_paths} and~\ref{fig:variable_paths}.
+  \item \texttt{export\_all\_figures.m}, called via the shell script \texttt{export\_figures.sh}, which regenerates all report figures in a reproducible way.
+  \item \texttt{animate\_constant\_case.m} and \texttt{animate\_variable\_case.m}, called via \texttt{export\_animations.sh}, which produce the animations described in Section~\ref{sec:visualisations}.
+\end{itemize}
+
+Unit tests are run through a single shell script \texttt{run\_tests.sh}, which invokes the \texttt{matlab.unittest} framework in headless mode via \texttt{matlab -batch}. Profiling and step counts for both regimes are collected by \texttt{profile\_simulations.m}, called through \texttt{run\_profiling.sh}. The tolerance study in Table~\ref{tab:tolerance} is driven by \texttt{convergence\_study.m} and a tolerance-parameterised driver \texttt{simulate\_constant\_case\_tol.m}.
 
 \section{Verification and validation}
 
@@ -139,10 +152,10 @@ For both questions, the ODE solver is used with relative tolerance \texttt{RelTo
 Each key component is verified in isolation:
 
 \begin{itemize}
-  \item \emph{Geometry:} line-segment intersection and blocking are tested on configurations where the correct outcome (intersect / not intersect) is known analytically.
-  \item \emph{Rabbit motion:} the mapping from time (or distance) to angular position and Cartesian coordinates is tested at $t=0$, at the burrow time and beyond, ensuring correct clamping at the burrow.
-  \item \emph{Fox logic:} target selection in both phases and the corresponding velocity direction are tested, including cases where the line-of-sight is and is not blocked by the fence segment.
-  \item \emph{ODE and events:} the constant-speed ODE is tested to ensure that the burrow event is triggered at $t\approx T_B^{\text{const}}$ and that the variable-speed ODE triggers the burrow event when $d_r\approx S_B$.
+  \item Geometry: line-segment intersection and blocking are tested on configurations where the correct outcome (intersect / not intersect) is known analytically.
+  \item Rabbit motion: the mapping from time (or distance) to angular position and Cartesian coordinates is tested at $t=0$, at the burrow time and beyond, ensuring correct clamping at the burrow.
+  \item Fox logic: target selection in both phases and the corresponding velocity direction are tested, including cases where the line-of-sight is and is not blocked by the fence segment.
+  \item ODE and events: the constant-speed ODE is tested to ensure that the burrow event is triggered at $t\approx T_B^{\text{const}}$ and that the variable-speed ODE triggers the burrow event when $d_r\approx S_B$.
 \end{itemize}
 
 This test suite is run as a single batch via a shell script, providing automated regression tests for the entire code base.
@@ -181,8 +194,8 @@ Within machine precision, the terminal time and fox distance are independent of 
 We measured the computational cost of the main simulations using a simple profiling script. On a standard laptop, the constant-speed and diminishing-speed simulations yielded:
 
 \begin{itemize}
-  \item \textbf{Constant-speed case:} $T\approx \SI{64.44}{\second}$, $d_f\approx\SI{1031.09}{\metre}$, with 402 stored time steps and a wall-clock runtime of approximately \SI{0.19}{\second}.
-  \item \textbf{Diminishing-speed case:} $T\approx \SI{91.79}{\second}$, $d_f\approx\SI{1287.67}{\metre}$, with approximately $2.4\times10^{7}$ stored time steps and a wall-clock runtime of roughly \SI{46}{\second}.
+  \item Constant-speed case: $T\approx \SI{64.44}{\second}$, $d_f\approx\SI{1031.09}{\metre}$, with 402 stored time steps and a wall-clock runtime of approximately \SI{0.19}{\second}.
+  \item Diminishing-speed case: $T\approx \SI{91.79}{\second}$, $d_f\approx\SI{1287.67}{\metre}$, with approximately $2.4\times10^{7}$ stored time steps and a wall-clock runtime of roughly \SI{46}{\second}.
 \end{itemize}
 
 The dramatic increase in step count and runtime for the diminishing-speed case is expected: both animals slow down as they accumulate distance, so the system evolves over a longer physical time interval and \texttt{ode45} must take many small steps to maintain the requested accuracy.
@@ -243,6 +256,32 @@ Figure~\ref{fig:variable_paths} shows the trajectories in the variable-speed cas
 \label{fig:variable_paths}
 \end{figure}
 
+\subsection*{Summary of numerical results}
+
+For clarity, Table~\ref{tab:summary} summarises the key numerical outcomes for both regimes.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcccc}
+\hline
+Case & $T$ (s) & $d_f(T)$ (m) & $d_r(T)$ (m) & Capture? \\
+\hline
+Constant speed &
+$64.44$ &
+$1031.09$ &
+$837.76$ (burrow arc) &
+No \\
+Diminishing speed &
+$91.79$ &
+$1287.67$ &
+$837.76$ (burrow arc) &
+No \\
+\hline
+\end{tabular}
+\caption{Comparison of terminal time $T$, fox distance $d_f(T)$ and rabbit distance $d_r(T)$ for the constant-speed and diminishing-speed models. In both regimes the fox fails to capture the rabbit before it reaches the burrow.}
+\label{tab:summary}
+\end{table}
+
 \section{Discussion}
 
 The results show that, in this geometric configuration, the presence of the gap $G$ and fence segment $AE$ is not sufficient for the fox to intercept the rabbit, even when it starts faster both in the constant-speed and diminishing-speed regimes. In the constant-speed case, the key limiting factor is the geometry: the rabbit effectively ``cuts the corner'' along the circle, while the fox must first reach the gap and then manoeuvre around the fence.
@@ -250,11 +289,53 @@ The results show that, in this geometric configuration, the presence of the gap 
 In the diminishing-speed case, both animals slow down with distance, but the relative advantage of the fox is not large enough to compensate for the geometric disadvantage. The fox arrives at the gap $G$ at approximately the same time that the rabbit reaches the burrow and cannot close the remaining distance before the rabbit reaches safety.
 
 \section{Supplementary visualisations}
+\label{sec:visualisations}
 
 In addition to the static figures, we generated animations of both scenarios, showing the evolving positions of the fox and rabbit along with the fence geometry. These animations, produced via headless \textsc{MATLAB} scripts, provide further qualitative confirmation of the trajectories reported in Figures~\ref{fig:constant_paths} and~\ref{fig:variable_paths} and would be suitable as supplementary material in an electronic submission.
 
 \section{Conclusions}
 
 We formulated the fox--rabbit chase as a piecewise-smooth dynamical system with event-based stopping criteria and implemented it in \textsc{MATLAB} using modular, unit-tested components. For both the constant-speed and diminishing-speed models, the numerical simulations indicate that the fox fails to capture the rabbit before it reaches the burrow. The framework developed here can be extended to explore alternative parameter regimes, different fence geometries or stochastic perturbations to the motion, and already includes basic profiling and convergence tools to support such future experiments.
+
+\appendix
+\section*{Appendix: Code structure}
+
+For reproducibility, the most important files are listed below:
+
+\begin{itemize}
+  \item \texttt{src/fox\_rabbit\_config.m} --- central configuration of speeds, geometry and tolerances.
+  \item \texttt{src/simulate\_constant\_case.m} --- constant-speed simulation (Question~1).
+  \item \texttt{src/simulate\_variable\_case.m} --- diminishing-speed simulation (Question~2).
+  \item \texttt{src/fox\_rabbit\_ode\_const.m}, \texttt{src/fox\_rabbit\_events\_const.m} --- ODE and events for the constant-speed case.
+  \item \texttt{src/fox\_rabbit\_ode\_var.m}, \texttt{src/fox\_rabbit\_events\_var.m} --- ODE and events for the variable-speed case.
+  \item \texttt{tests/} --- unit tests for geometry, rabbit motion, fox logic and both simulation drivers.
+\end{itemize}
+
+The shell scripts \texttt{run\_tests.sh}, \texttt{run\_profiling.sh}, \texttt{export\_figures.sh} and \texttt{export\_animations.sh} provide single-command entry points for verification, profiling and figure/animation generation.
+
+\section*{References}
+
+\begin{thebibliography}{9}
+
+\bibitem{matlab:ode45}
+The MathWorks, Inc.
+\newblock \emph{ODE Suite: \texttt{ode45} Documentation}.
+\newblock Available in the MATLAB online documentation.
+
+\bibitem{matlab:unittest}
+The MathWorks, Inc.
+\newblock \emph{\texttt{matlab.unittest} Framework Documentation}.
+\newblock Available in the MATLAB online documentation.
+
+\bibitem{ascher:ode}
+U.~M. Ascher and L.~R. Petzold.
+\newblock \emph{Computer Methods for Ordinary Differential Equations and Differential-Algebraic Equations}.
+\newblock SIAM, 1998.
+
+\bibitem{pursuit}
+W.~E. Boyce and R.~C. DiPrima,
+\newblock \emph{Elementary Differential Equations and Boundary Value Problems}, John Wiley \& Sons.
+
+\end{thebibliography}
 
 \end{document}
