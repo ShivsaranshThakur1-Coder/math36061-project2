@@ -9,7 +9,7 @@
 \sisetup{round-mode=figures,round-precision=3}
 
 \title{MATH36031 Project 2:\\Fox--Rabbit Chase on a Circular Fence}
-\author{Shivsaransh Thakur}
+\author{Student ID: 10916801} % replace XXXXXXXX with your ID before submission
 \date{\today}
 
 \begin{document}
@@ -143,7 +143,7 @@ The code base is organised in a modular way under a single \texttt{src/} directo
   \item \texttt{animate\_constant\_case.m} and \texttt{animate\_variable\_case.m}, called via \texttt{export\_animations.sh}, which produce the animations described in Section~\ref{sec:visualisations}.
 \end{itemize}
 
-Unit tests are run through a single shell script \texttt{run\_tests.sh}, which invokes the \texttt{matlab.unittest} framework in headless mode via \texttt{matlab -batch}. Profiling and step counts for both regimes are collected by \texttt{profile\_simulations.m}, called through \texttt{run\_profiling.sh}. The tolerance study in Table~\ref{tab:tolerance} is driven by \texttt{convergence\_study.m} and a tolerance-parameterised driver \texttt{simulate\_constant\_case\_tol.m}.
+Unit tests can be run directly inside \textsc{MATLAB} via \texttt{runtests('tests')}. On my system I also use the shell script \texttt{run\_tests.sh}, which invokes the \texttt{matlab.unittest} framework in headless mode via \texttt{matlab -batch}. Profiling and step counts for both regimes are collected by \texttt{profile\_simulations.m}, called through \texttt{run\_profiling.sh}. The tolerance study in Table~\ref{tab:tolerance} is driven by \texttt{convergence\_study.m} and a tolerance-parameterised driver \texttt{simulate\_constant\_case\_tol.m}.
 
 \section{Verification and validation}
 
@@ -158,7 +158,7 @@ Each key component is verified in isolation:
   \item ODE and events: the constant-speed ODE is tested to ensure that the burrow event is triggered at $t\approx T_B^{\text{const}}$ and that the variable-speed ODE triggers the burrow event when $d_r\approx S_B$.
 \end{itemize}
 
-This test suite is run as a single batch via a shell script, providing automated regression tests for the entire code base.
+This test suite is run as a single batch via \texttt{runtests('tests')} and, on my system, via the shell script \texttt{run\_tests.sh}.
 
 \subsection{Tolerance study for the constant-speed case}
 
@@ -311,7 +311,11 @@ For reproducibility, the most important files are listed below:
   \item \texttt{tests/} --- unit tests for geometry, rabbit motion, fox logic and both simulation drivers.
 \end{itemize}
 
-The shell scripts \texttt{run\_tests.sh}, \texttt{run\_profiling.sh}, \texttt{export\_figures.sh} and \texttt{export\_animations.sh} provide single-command entry points for verification, profiling and figure/animation generation.
+The shell scripts \texttt{run\_tests.sh}, \texttt{run\_profiling.sh}, \texttt{export\_figures.sh} and \texttt{export\_animations.sh} provide single-command entry points for verification, profiling and figure/animation generation on my system; all core functionality can also be accessed directly from within \textsc{MATLAB}.
+
+\section*{Note on the use of AI tools}
+
+Portions of the code structure and the LaTeX report wording were developed with assistance from the AI tool ChatGPT. All mathematical modelling choices, numerical results and interpretations have been checked by the author and remain their own responsibility.
 
 \begin{thebibliography}{9}
 
