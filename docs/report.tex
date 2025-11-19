@@ -5,19 +5,9 @@
 \usepackage{geometry}
 \usepackage{siunitx}
 \usepackage{hyperref}
-\usepackage{listings}
+\usepackage{verbatim}
 \geometry{margin=2.5cm}
 \sisetup{round-mode=figures,round-precision=3}
-
-\lstset{
-  basicstyle=\ttfamily\footnotesize,
-  breaklines=true,
-  columns=fullflexible,
-  frame=single,
-  numbers=left,
-  numberstyle=\tiny,
-  xleftmargin=2em,
-}
 
 \title{MATH36031 Project 2:\\Fox--Rabbit Chase on a Circular Fence}
 \author{Student ID: 10916801}
@@ -273,28 +263,356 @@ The results show that, in this geometric configuration, the presence of the gap 
 
 In the diminishing-speed case, both animals slow down with distance, but the relative advantage of the fox is not large enough to compensate for the geometric disadvantage. The fox arrives at the gap $G$ at approximately the same time that the rabbit reaches the burrow and cannot close the remaining distance before the rabbit reaches safety. Animations (not included here) confirm visually the behaviour summarised in Figures~\ref{fig:constant_paths} and~\ref{fig:variable_paths}.
 
+\section{Conclusions}
+
+We formulated the fox--rabbit chase as a piecewise-smooth dynamical system with event-based stopping criteria and implemented it in \textsc{MATLAB} using modular components. For both the constant-speed and diminishing-speed models, the numerical simulations indicate that the fox fails to capture the rabbit before it reaches the burrow. The framework developed here could be extended to explore alternative parameter regimes, different fence geometries or stochastic perturbations to the motion.
+
 \appendix
 \section*{Appendix: MATLAB code (main drivers and ODE/event functions)}
 
-The following listings show the full MATLAB source of the main simulation drivers and ODE/event functions used to produce the results in this report. Paths are relative to the project root; \texttt{report.tex} resides in \texttt{docs/} and the code in \texttt{src/}.
+The following listings show the full MATLAB source of the main simulation drivers and ODE/event
+functions used to produce the results in this report.
 
 \subsection*{simulate\_constant\_case.m}
-\lstinputlisting[language=Matlab]{../src/simulate_constant_case.m}
+
+{\footnotesize
+\begin{verbatim}
+function result = simulate_constant_case()
+%SIMULATE_CONSTANT_CASE Run the constant-speed fox–rabbit chase.
+
+cfg = fox_rabbit_config();
+
+% Phase 1: fox runs from F0 to G
+phase1 = 1;
+t0 = 0.0;
+y0 = cfg.F0(:);
+
+time_to_G = norm(cfg.G - cfg.F0) / cfg.sf;
+tspan1 = [t0, time_to_G];
+
+odefun1 = @(t, y) fox_rabbit_ode_const(t, y, cfg, phase1);
+opts1 = odeset('RelTol', 1e-8, 'AbsTol', 1e-10);
+
+[t1, y1] = ode45(odefun1, tspan1, y0, opts1);
+
+% Phase 2: chase with blocking
+phase2 = 2;
+tspan2 = [t1(end), cfg.time_to_burrow];
+y0_2 = y1(end, :).';
+
+odefun2 = @(t, y) fox_rabbit_ode_const(t, y, cfg, phase2);
+eventfun2 = @(t, y) fox_rabbit_events_const(t, y, cfg, phase2);
+
+opts2 = odeset('Events', eventfun2, ...
+               'RelTol', 1e-8, ...
+               'AbsTol', 1e-10);
+
+[t2, y2, te, ye, ie] = ode45(odefun2, tspan2, y0_2, opts2);
+
+% Decide outcome and final time T
+if isempty(te)
+    T = t2(end);
+    F_T = y2(end, :);
+    captured = false;
+else
+    T = te(end);
+    F_T = ye(end, :);
+    captured = (ie(end) == 1);
+end
+
+% Build full paths
+t_all = [t1; t2];
+F_all = [y1; y2];
+
+[Rx_all, Ry_all] = rabbit_position_const(t_all, cfg);
+R_all = [Rx_all, Ry_all];
+
+% Distance travelled by fox
+fox_distance = cfg.sf * T;
+
+% Pack result struct
+result = struct();
+result.captured = captured;
+result.T = T;
+result.fox_pos_T = F_T;
+result.fox_distance = fox_distance;
+result.t = t_all;
+result.F = F_all;
+result.R = R_all;
+end
+\end{verbatim}
+}
 
 \subsection*{fox\_rabbit\_ode\_const.m}
-\lstinputlisting[language=Matlab]{../src/fox_rabbit_ode_const.m}
+
+{\footnotesize
+\begin{verbatim}
+function dydt = fox_rabbit_ode_const(t, y, cfg, phase)
+%FOX_RABBIT_ODE_CONST Fox ODE for the constant-speed chase.
+
+Fx = y(1);
+Fy = y(2);
+F = [Fx, Fy];
+
+[Rx, Ry] = rabbit_position_const(t, cfg);
+R = [Rx, Ry];
+
+v = fox_velocity_const(F, R, cfg, phase);
+
+dydt = [v(1); v(2)];
+end
+\end{verbatim}
+}
 
 \subsection*{fox\_rabbit\_events\_const.m}
-\lstinputlisting[language=Matlab]{../src/fox_rabbit_events_const.m}
+
+{\footnotesize
+\begin{verbatim}
+function [value, isterminal, direction] = fox_rabbit_events_const(t, y, cfg, phase)
+%FOX_RABBIT_EVENTS_CONST Events for the constant-speed fox–rabbit ODE.
+%   Events:
+%     1) Capture: ||F - R|| - capture_tol = 0
+%     2) Rabbit reaches burrow: t - time_to_burrow = 0
+
+Fx = y(1);
+Fy = y(2);
+F = [Fx, Fy];
+
+[Rx, Ry] = rabbit_position_const(t, cfg);
+R = [Rx, Ry];
+
+dist_FR = norm(F - R);
+capture_value = dist_FR - cfg.capture_tol;
+
+burrow_value = t - cfg.time_to_burrow;
+
+value = [capture_value; burrow_value];
+isterminal = [1; 1];
+direction = [0; 0];
+end
+\end{verbatim}
+}
 
 \subsection*{simulate\_variable\_case.m}
-\lstinputlisting[language=Matlab]{../src/simulate_variable_case.m}
+
+{\footnotesize
+\begin{verbatim}
+function result = simulate_variable_case()
+%SIMULATE_VARIABLE_CASE Run the diminishing-speed fox–rabbit chase.
+
+cfg = fox_rabbit_config();
+
+% Initial state: [Fx; Fy; df; dr]
+t0 = 0.0;
+Fx0 = cfg.F0(1);
+Fy0 = cfg.F0(2);
+df0 = 0.0;
+dr0 = 0.0;
+y0 = [Fx0; Fy0; df0; dr0];
+
+Tmax = 1e4;
+
+% Phase 1: fox runs towards G
+phase1 = 1;
+odefun1 = @(t, y) fox_rabbit_ode_var(t, y, cfg, phase1);
+eventfun1 = @(t, y) fox_rabbit_events_var(t, y, cfg, phase1);
+
+opts1 = odeset('Events', eventfun1, ...
+               'RelTol', 1e-8, ...
+               'AbsTol', 1e-10);
+
+[t1, y1, te1, ye1, ie1] = ode45(odefun1, [t0, Tmax], y0, opts1);
+
+t_all = t1;
+y_all = y1;
+
+if ~isempty(te1)
+    last_event = ie1(end);
+    T = te1(end);
+    yT = ye1(end, :).';
+
+    switch last_event
+        case 1
+            captured = true;
+        case 2
+            captured = false;
+        case 3
+            captured = [];
+        otherwise
+            error('simulate_variable_case:UnknownEvent', ...
+                  'Unknown event index in phase 1: %d', last_event);
+    end
+else
+    last_event = NaN;
+    T = t1(end);
+    yT = y1(end, :).';
+    captured = [];
+end
+
+if isempty(te1) || last_event ~= 3
+    result = pack_variable_result(cfg, t_all, y_all, T, yT, captured);
+    return;
+end
+
+% Phase 2: chase with blocking
+phase2 = 2;
+t0_2 = T;
+y0_2 = yT;
+
+odefun2 = @(t, y) fox_rabbit_ode_var(t, y, cfg, phase2);
+eventfun2 = @(t, y) fox_rabbit_events_var(t, y, cfg, phase2);
+
+opts2 = odeset('Events', eventfun2, ...
+               'RelTol', 1e-8, ...
+               'AbsTol', 1e-10);
+
+[t2, y2, te2, ye2, ie2] = ode45(odefun2, [t0_2, t0_2 + Tmax], y0_2, opts2);
+
+t_all = [t_all; t2];
+y_all = [y_all; y2];
+
+if ~isempty(te2)
+    last_event2 = ie2(end);
+    T = te2(end);
+    yT = ye2(end, :).';
+
+    switch last_event2
+        case 1
+            captured = true;
+        case 2
+            captured = false;
+        otherwise
+            error('simulate_variable_case:UnknownEventPhase2', ...
+                  'Unknown event index in phase 2: %d', last_event2);
+    end
+else
+    T = t2(end);
+    yT = y2(end, :).';
+    captured = false;
+end
+
+result = pack_variable_result(cfg, t_all, y_all, T, yT, captured);
+end
+
+function result = pack_variable_result(cfg, t_all, y_all, T, yT, captured)
+% Helper to assemble result struct for variable-speed case.
+
+Fx_all = y_all(:, 1);
+Fy_all = y_all(:, 2);
+df_all = y_all(:, 3);
+dr_all = y_all(:, 4);
+
+F_all = [Fx_all, Fy_all];
+
+[xR, yR] = rabbit_position_from_distance(dr_all, cfg);
+R_all = [xR, yR];
+
+df_T = yT(3);
+dr_T = yT(4);
+F_T = yT(1:2).';
+
+result = struct();
+result.captured = logical(captured);
+result.T = T;
+result.fox_pos_T = F_T;
+result.fox_distance = df_T;
+result.rabbit_distance = dr_T;
+result.t = t_all;
+result.F = F_all;
+result.R = R_all;
+result.df = df_all;
+result.dr = dr_all;
+end
+\end{verbatim}
+}
 
 \subsection*{fox\_rabbit\_ode\_var.m}
-\lstinputlisting[language=Matlab]{../src/fox_rabbit_ode_var.m}
+
+{\footnotesize
+\begin{verbatim}
+function dydt = fox_rabbit_ode_var(t, y, cfg, phase)
+%FOX_RABBIT_ODE_VAR Variable-speed fox–rabbit ODE (Question 2).
+
+Fx = y(1);
+Fy = y(2);
+df = y(3);
+dr = y(4);
+
+F = [Fx, Fy];
+
+sf = fox_speed_var(df, cfg);
+sr = rabbit_speed_var(dr, cfg);
+
+[Rx, Ry] = rabbit_position_from_distance(dr, cfg);
+R = [Rx, Ry];
+
+switch phase
+    case 1
+        T = cfg.G;
+    case 2
+        T = fox_target_point(F, R, cfg, 2);
+    otherwise
+        error('fox_rabbit_ode_var:InvalidPhase', ...
+              'Unsupported phase: %d', phase);
+end
+
+dir = T - F;
+d = norm(dir);
+
+if d < 1e-12
+    vF = [0.0, 0.0];
+else
+    vF = (sf / d) * dir;
+end
+
+dydt = [
+    vF(1);
+    vF(2);
+    sf;
+    sr;
+];
+end
+\end{verbatim}
+}
 
 \subsection*{fox\_rabbit\_events\_var.m}
-\lstinputlisting[language=Matlab]{../src/fox_rabbit_events_var.m}
+
+{\footnotesize
+\begin{verbatim}
+function [value, isterminal, direction] = fox_rabbit_events_var(t, y, cfg, phase)
+%FOX_RABBIT_EVENTS_VAR Events for variable-speed fox–rabbit ODE (Question 2).
+%
+%   Events:
+%     1) Capture: ||F - R|| - capture_tol = 0
+%     2) Rabbit reaches burrow: dr - arc_length_to_burrow = 0
+%     3) Fox reaches gap G (phase 1 only)
+
+Fx = y(1);
+Fy = y(2);
+dr = y(4);
+
+F = [Fx, Fy];
+
+[Rx, Ry] = rabbit_position_from_distance(dr, cfg);
+R = [Rx, Ry];
+
+dist_FR = norm(F - R);
+capture_value = dist_FR - cfg.capture_tol;
+
+burrow_value = dr - cfg.arc_length_to_burrow;
+
+if phase == 1
+    gap_value = norm(F - cfg.G);
+else
+    gap_value = 1.0;
+end
+
+value = [capture_value; burrow_value; gap_value];
+isterminal = [1; 1; 1];
+direction = [0; 0; 0];
+end
+\end{verbatim}
+}
 
 \section*{Note on the use of AI tools}
 
