@@ -5,12 +5,23 @@
 \usepackage{geometry}
 \usepackage{siunitx}
 \usepackage{hyperref}
+\usepackage{listings}
 \geometry{margin=2.5cm}
 \sisetup{round-mode=figures,round-precision=3}
 
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  columns=fullflexible,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny,
+  xleftmargin=2em,
+}
+
 \title{MATH36031 Project 2:\\Fox--Rabbit Chase on a Circular Fence}
-\author{Student ID: 10916801} % replace XXXXXXXX with your ID before submission
-\date{\today}
+\author{Student ID: 10916801}
+\date{18 November 2025}
 
 \begin{document}
 \maketitle
@@ -120,7 +131,7 @@ We record the stopping time $T$, the fox position $F(T)$ and the distances $d_f(
 
 \section{Numerical method}
 
-All simulations were implemented in \textsc{MATLAB} using the built-in solver \texttt{ode45}, an explicit Runge--Kutta (4,5) method with adaptive time stepping. The implementation is structured into small, unit-tested components under \texttt{src/} with tests under \texttt{tests/}:
+All simulations were implemented in \textsc{MATLAB} using the built-in solver \texttt{ode45}, an explicit Runge--Kutta (4,5) method with adaptive time stepping. The implementation is structured into small components:
 
 \begin{itemize}
   \item Geometric primitives: segment intersection and line-of-sight blocking for the fence segment $AE$.
@@ -130,20 +141,7 @@ All simulations were implemented in \textsc{MATLAB} using the built-in solver \t
   \item High-level drivers: \texttt{simulate\_constant\_case} and \texttt{simulate\_variable\_case} orchestrate the phases (running to $G$, then chasing) and assemble full trajectories.
 \end{itemize}
 
-For both questions, the ODE solver is used with relative tolerance \texttt{RelTol = 1e-8} and absolute tolerance \texttt{AbsTol = 1e-10} in the main experiments. Events are implemented via custom event functions passed through \texttt{odeset}. All tests are executed using the \texttt{matlab.unittest} framework via a single script \texttt{run\_tests.sh}, which can be used in continuous integration.
-
-\section{Implementation and code structure}
-
-The code base is organised in a modular way under a single \texttt{src/} directory, with unit tests in \texttt{tests/}. The key entry points are:
-\begin{itemize}
-  \item \texttt{simulate\_constant\_case.m}, which implements the constant-speed fox--rabbit chase used to answer Question~1.
-  \item \texttt{simulate\_variable\_case.m}, which implements the diminishing-speed model used in Question~2.
-  \item \texttt{plot\_constant\_case.m} and \texttt{plot\_variable\_case.m}, which generate the path plots in Figures~\ref{fig:constant_paths} and~\ref{fig:variable_paths}.
-  \item \texttt{export\_all\_figures.m}, called via the shell script \texttt{export\_figures.sh}, which regenerates all report figures in a reproducible way.
-  \item \texttt{animate\_constant\_case.m} and \texttt{animate\_variable\_case.m}, called via \texttt{export\_animations.sh}, which produce the animations described in Section~\ref{sec:visualisations}.
-\end{itemize}
-
-Unit tests can be run directly inside \textsc{MATLAB} via \texttt{runtests('tests')}. On my system I also use the shell script \texttt{run\_tests.sh}, which invokes the \texttt{matlab.unittest} framework in headless mode via \texttt{matlab -batch}. Profiling and step counts for both regimes are collected by \texttt{profile\_simulations.m}, called through \texttt{run\_profiling.sh}. The tolerance study in Table~\ref{tab:tolerance} is driven by \texttt{convergence\_study.m} and a tolerance-parameterised driver \texttt{simulate\_constant\_case\_tol.m}.
+For both questions, the ODE solver is used with relative tolerance \texttt{RelTol = 1e-8} and absolute tolerance \texttt{AbsTol = 1e-10}. Events are implemented via custom event functions passed through \texttt{odeset}. Unit tests can be run directly in \textsc{MATLAB} via \texttt{runtests('tests')}.
 
 \section{Verification and validation}
 
@@ -157,8 +155,6 @@ Each key component is verified in isolation:
   \item Fox logic: target selection in both phases and the corresponding velocity direction are tested, including cases where the line-of-sight is and is not blocked by the fence segment.
   \item ODE and events: the constant-speed ODE is tested to ensure that the burrow event is triggered at $t\approx T_B^{\text{const}}$ and that the variable-speed ODE triggers the burrow event when $d_r\approx S_B$.
 \end{itemize}
-
-This test suite is run as a single batch via \texttt{runtests('tests')} and, on my system, via the shell script \texttt{run\_tests.sh}.
 
 \subsection{Tolerance study for the constant-speed case}
 
@@ -188,17 +184,6 @@ $10^{-10}$ & $10^{-12}$ & 64.44292623 & 1031.086820 & 654 & 0 \\
 \end{table}
 
 Within machine precision, the terminal time and fox distance are independent of the tolerances used. This confirms that the reported values are not numerical artefacts of a particular tolerance choice.
-
-\subsection{Performance and computational cost}
-
-We measured the computational cost of the main simulations using a simple profiling script. On a standard laptop, the constant-speed and diminishing-speed simulations yielded:
-
-\begin{itemize}
-  \item Constant-speed case: $T\approx \SI{64.44}{\second}$, $d_f\approx\SI{1031.09}{\metre}$, with 402 stored time steps and a wall-clock runtime of approximately \SI{0.19}{\second}.
-  \item Diminishing-speed case: $T\approx \SI{91.79}{\second}$, $d_f\approx\SI{1287.67}{\metre}$, with approximately $2.4\times10^{7}$ stored time steps and a wall-clock runtime of roughly \SI{46}{\second}.
-\end{itemize}
-
-The dramatic increase in step count and runtime for the diminishing-speed case is expected: both animals slow down as they accumulate distance, so the system evolves over a longer physical time interval and \texttt{ode45} must take many small steps to maintain the requested accuracy.
 
 \section{Results}
 
@@ -286,32 +271,30 @@ No \\
 
 The results show that, in this geometric configuration, the presence of the gap $G$ and fence segment $AE$ is not sufficient for the fox to intercept the rabbit, even when it starts faster both in the constant-speed and diminishing-speed regimes. In the constant-speed case, the key limiting factor is the geometry: the rabbit effectively ``cuts the corner'' along the circle, while the fox must first reach the gap and then manoeuvre around the fence.
 
-In the diminishing-speed case, both animals slow down with distance, but the relative advantage of the fox is not large enough to compensate for the geometric disadvantage. The fox arrives at the gap $G$ at approximately the same time that the rabbit reaches the burrow and cannot close the remaining distance before the rabbit reaches safety.
-
-\section{Supplementary visualisations}
-\label{sec:visualisations}
-
-In addition to the static figures, we generated animations of both scenarios, showing the evolving positions of the fox and rabbit along with the fence geometry. These animations, produced via headless \textsc{MATLAB} scripts, provide further qualitative confirmation of the trajectories reported in Figures~\ref{fig:constant_paths} and~\ref{fig:variable_paths} and would be suitable as supplementary material in an electronic submission.
-
-\section{Conclusions}
-
-We formulated the fox--rabbit chase as a piecewise-smooth dynamical system with event-based stopping criteria and implemented it in \textsc{MATLAB} using modular, unit-tested components. For both the constant-speed and diminishing-speed models, the numerical simulations indicate that the fox fails to capture the rabbit before it reaches the burrow. The framework developed here can be extended to explore alternative parameter regimes, different fence geometries or stochastic perturbations to the motion, and already includes basic profiling and convergence tools to support such future experiments.
+In the diminishing-speed case, both animals slow down with distance, but the relative advantage of the fox is not large enough to compensate for the geometric disadvantage. The fox arrives at the gap $G$ at approximately the same time that the rabbit reaches the burrow and cannot close the remaining distance before the rabbit reaches safety. Animations (not included here) confirm visually the behaviour summarised in Figures~\ref{fig:constant_paths} and~\ref{fig:variable_paths}.
 
 \appendix
-\section*{Appendix: Code structure}
+\section*{Appendix: MATLAB code (main drivers and ODE/event functions)}
 
-For reproducibility, the most important files are listed below:
+The following listings show the full MATLAB source of the main simulation drivers and ODE/event functions used to produce the results in this report. Paths are relative to the project root; \texttt{report.tex} resides in \texttt{docs/} and the code in \texttt{src/}.
 
-\begin{itemize}
-  \item \texttt{src/fox\_rabbit\_config.m} --- central configuration of speeds, geometry and tolerances.
-  \item \texttt{src/simulate\_constant\_case.m} --- constant-speed simulation (Question~1).
-  \item \texttt{src/simulate\_variable\_case.m} --- diminishing-speed simulation (Question~2).
-  \item \texttt{src/fox\_rabbit\_ode\_const.m}, \texttt{src/fox\_rabbit\_events\_const.m} --- ODE and events for the constant-speed case.
-  \item \texttt{src/fox\_rabbit\_ode\_var.m}, \texttt{src/fox\_rabbit\_events\_var.m} --- ODE and events for the variable-speed case.
-  \item \texttt{tests/} --- unit tests for geometry, rabbit motion, fox logic and both simulation drivers.
-\end{itemize}
+\subsection*{simulate\_constant\_case.m}
+\lstinputlisting[language=Matlab]{../src/simulate_constant_case.m}
 
-The shell scripts \texttt{run\_tests.sh}, \texttt{run\_profiling.sh}, \texttt{export\_figures.sh} and \texttt{export\_animations.sh} provide single-command entry points for verification, profiling and figure/animation generation on my system; all core functionality can also be accessed directly from within \textsc{MATLAB}.
+\subsection*{fox\_rabbit\_ode\_const.m}
+\lstinputlisting[language=Matlab]{../src/fox_rabbit_ode_const.m}
+
+\subsection*{fox\_rabbit\_events\_const.m}
+\lstinputlisting[language=Matlab]{../src/fox_rabbit_events_const.m}
+
+\subsection*{simulate\_variable\_case.m}
+\lstinputlisting[language=Matlab]{../src/simulate_variable_case.m}
+
+\subsection*{fox\_rabbit\_ode\_var.m}
+\lstinputlisting[language=Matlab]{../src/fox_rabbit_ode_var.m}
+
+\subsection*{fox\_rabbit\_events\_var.m}
+\lstinputlisting[language=Matlab]{../src/fox_rabbit_events_var.m}
 
 \section*{Note on the use of AI tools}
 
